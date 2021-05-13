@@ -73,6 +73,15 @@ namespace JosephM.Xrm.FieldChangeHistory.Plugins.Services
                     var targetFieldForChange = fieldChangeConfiguration.GetStringField(Fields.jmcg_fieldchangeconfiguration_.jmcg_field);
                     var runAs = fieldChangeConfiguration.GetField(Fields.jmcg_fieldchangeconfiguration_.jmcg_runpluginas) as EntityReference;
 
+                    List<string> dependantFields = new List<string>();
+                    if(message == PluginMessage.Update)
+                    {
+                        dependantFields.Add(fieldChangeConfiguration.GetStringField(Fields.jmcg_fieldchangeconfiguration_.jmcg_field));
+                        var config = LoadCalculatedFieldConfig(fieldChangeConfiguration);
+                        dependantFields.AddRange(XrmEntity.GetFieldsInFilter(config.FilterExpression));
+                        dependantFields = dependantFields.Distinct().ToList();
+                    }
+
                     var serialised = SerialiseToString(fieldChangeConfiguration);
                     if (sdkMessage.Id == Guid.Empty)
                     {
@@ -87,6 +96,10 @@ namespace JosephM.Xrm.FieldChangeHistory.Plugins.Services
                         if (runAs != null)
                         {
                             sdkMessage.SetField(Fields.sdkmessageprocessingstep_.impersonatinguserid, runAs);
+                        }
+                        if (message == PluginMessage.Update)
+                        {
+                            sdkMessage.SetField(Fields.sdkmessageprocessingstep_.filteringattributes, string.Join(",", dependantFields));
                         }
                         sdkMessage.Id = XrmService.Create(sdkMessage);
 
@@ -112,6 +125,10 @@ namespace JosephM.Xrm.FieldChangeHistory.Plugins.Services
                         if (!XrmEntity.FieldsEqual(runAs, sdkMessage.GetField(Fields.sdkmessageprocessingstep_.impersonatinguserid)))
                         {
                             updateEntity.SetField(Fields.sdkmessageprocessingstep_.impersonatinguserid, runAs);
+                        }
+                        if (message == PluginMessage.Update)
+                        {
+                            updateEntity.SetField(Fields.sdkmessageprocessingstep_.filteringattributes, string.Join(",", dependantFields));
                         }
                         XrmService.Update(updateEntity);
                     }
